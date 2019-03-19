@@ -2,7 +2,7 @@
 * File name   : gpio.c                                                                          *
 * Authors     : Nachiket Kelkar and Puneet Bansal                                               *
 * Description : The functions used for gpio operations. Setting the direction of pin and        *
-* 				the value. This functions are restricted for use of only USER LED pins.         *
+*               the value. This functions are restricted for use of only USER LED pins.         *
 * Tools used  : GNU make.                                                                       *
 ************************************************************************************************/
 

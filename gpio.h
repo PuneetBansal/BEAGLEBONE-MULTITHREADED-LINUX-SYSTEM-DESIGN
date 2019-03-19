@@ -2,7 +2,7 @@
 * File name   : gpio.h                                                                          *
 * Authors     : Nachiket Kelkar and Puneet Bansal                                               *
 * Description : The functions used for gpio operations. Setting the direction of pin and        *
-* 				the value.                                                                      *
+*               the value.                                                                      *
 * Tools used  : GNU make.                                                                       *
 ************************************************************************************************/
 

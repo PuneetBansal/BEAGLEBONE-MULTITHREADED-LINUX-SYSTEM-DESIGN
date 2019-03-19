@@ -1,12 +1,15 @@
 
-prog: gpio54.o gpio.o 
-	arm-linux-gcc gpio54.o gpio.o -o gpio54
+prog: main.o gpio.o temp_i2c.o
+	arm-linux-gcc main.o gpio.o temp_i2c.o -o main
 
-gpio54.o: gpio54.c gpio.h
-	arm-linux-gcc -c gpio54.c
+main.o: main.c gpio.h temp_i2c.h
+	arm-linux-gcc -c main.c
 
 gpio.o: gpio.c gpio.h
 	arm-linux-gcc -c gpio.c
+
+temp_i2c.o: temp_i2c.c temp_i2c.h my_i2c.h
+	arm-linux-gcc -c temp_i2c.c
 
 clean: 
 	rm *.o
