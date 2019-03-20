@@ -192,7 +192,7 @@ void *temperature_monitor(void* information)
 	{
 		data_received = (temp_msg*)buffer;
 	}
-	if(!(strcmp(data_recevied->source,"socket"))
+	if((strcmp(data_recevied->source,"socket"))==0)s
 	{
 		temperature = read_temperature(file_fd, TEMP_REG_ADDR, data_received->temperature_unit)
 		//write the source as temperature, write the value of temperature and temperature unit
