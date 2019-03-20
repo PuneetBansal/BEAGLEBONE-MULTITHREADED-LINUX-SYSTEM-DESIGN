@@ -20,6 +20,7 @@
 /************* The user library containing required information *************/
 #include "temp_i2c.h"
 #include "myi2c.h"
+#include "logger.h"
 
 
 int temp_i2c_init(uint8_t slave_addr)
@@ -124,21 +125,22 @@ void *temperature_monitor(void* information)
 	temp_i2c_write_to_reg(file_fd, CONFIG_REG_ADDR, temp_sens_config);
 
 
-	//setup the queue for temperature task
-	struct mq_attr temp_queue_attr;
-	mqd_t temperature_mqueue;
+	//Initialize the queue for temperature task and logger.
+	mqd_t temperature_mqueue, logger_mqueue;
 	
-	temp_queue_attr.mq_maxmsg  = TEMP_QUEUE_SIZE;
-	temp_queue_attr.mq_msgsize = sizeof(temp_msg);
-	temp_queue_attr.mq_flags   = O_NONBLOCK;
-	
-	temperature_mqueue = mq_open(TEMP_QUEUE_SIZE, O_CREAT | O_RDWR, 0666, &temp_queue_attr);
+	temperature_mqueue = mqueue_init(TEMP_SENS_QUEUE, TEMP_QUEUE_SIZE, sizeof(temp_msg));
 	if(temperature_mqueue == (mqd_t) -1)
 	{
-		perror("Error opening the queue:");
+		perror("Error opening the temperature queue:");
 		exit(1);
 	}
-	
+
+	logger_mqueue = mqueue_init(LOGGER_QUEUE, LOGGER_QUEUE_SIZE, sizeof(logger_msg));
+	if(logger_mqueue == (mqd_t) -1)
+	{
+		perror("Error opening the logger queue:");
+	}
+
 	//setup a timer to fire a signal every short interval to wakeup and take the readings
 	//reference: http://man7.org/linux/man-pages/man2/timer_create.2.html 
 	timer_t temp_timer_id;
@@ -172,11 +174,22 @@ void *temperature_monitor(void* information)
 	float temperature;
 	struct temp_msg *data_received;
 	
-	temperature = read_temperature(file_fd, TEMP_REG_ADDR, Celsius);
+	temperature = read_temperature(file_fd, TEMP_REG_ADDR, DEFAULT_UNIT);
 	printf("Temperature is %f",temperature);
 	//if readings are valid then send the heart beat message to the main task.
 	if(temperature > -55 && temperature < 128)
 	{
+		struct logger_msg data_send;
+		data_send.source       = "temperature";
+		data_send.message_type = success;
+		data_send.value        = temperature;
+		data_send.unit         = DEFAULT_UNIT;
+	
+		int ret = mq_send(temperature_mqueue, (char*)&data_send, sizeof(data_send), 0);
+		if(ret == -1)
+		{
+			perror("Send error:");
+		}
 		//send heart-beat to main, temperature value to logger.
 	}
 	
@@ -198,4 +211,18 @@ void *temperature_monitor(void* information)
 		//write the source as temperature, write the value of temperature and temperature unit
 		//open the socket queue and send the message to socket queue	
 	}
+}
+
+mqd_t mqueue_init(char* queue_name, int queue_size, int message_size)
+{
+	mqd_t msg_q_des;
+	struct mq_attr queue_attr;
+	
+	queue_attr.mq_maxmsg  = queue_size;
+	queue_attr.mq_msgsize = message_size;
+	queue_attr.mq_flags   = O_NONBLOCK;
+	
+	msg_q_des = mq_open(queue_name, O_CREAT | O_RDWR, 0666, &queue_attr);
+
+	return msg_q_des;
 }

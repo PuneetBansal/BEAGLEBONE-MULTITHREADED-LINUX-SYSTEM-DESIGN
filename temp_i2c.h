@@ -20,6 +20,8 @@ Fahrenheit,
 Kelvin,
 };
 
+#define DEFAULT_UNIT Celsius;
+
 /* Default slave address */
 #define DEFAULT_SLAVE_ADDRESS 0X48
 

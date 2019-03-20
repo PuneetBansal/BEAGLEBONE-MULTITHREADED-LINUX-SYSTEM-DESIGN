@@ -6,9 +6,10 @@
 *               required readings from tasks and writing it to a log file.                      *
 * Tools used  : GNU make.                                                                       *
 ************************************************************************************************/
-
 #include <stdint.h>
+#include <stdio.h>
 
+/* Format of message that is sent to logger thread by temperature, light or main thread */
 typedef struct{
 	char* source;
 	int message_type;
@@ -17,11 +18,15 @@ typedef struct{
 	int unit;
 }logger_msg;
 
+/* Enumeration for type of message whether success or failure */
 enum message_type{
 	success,
 	fail,
 };
 
+/* Macros for queue setup */
+#define LOGGER_QUEUE       "/logging"
+#define LOGGER_QUEUE_SIZE  15
 
 /* The functions that are used to log the messages to the log file */
 
