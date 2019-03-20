@@ -7,6 +7,12 @@
 ************************************************************************************************/
 #include <stdint.h>
 
+/* Format of meassge that is sent to temperature thread */
+typedef struct{
+    int temperature_unit;
+    char* source;
+}temp_msg;
+
 /* Enumeration for temperature units available */
 enum temperature_unit{
 Celsius = 0,
@@ -28,10 +34,10 @@ Kelvin,
 #define DEFAULT_CONFIG        0x60A0
 #define MODE_12BIT            (0 << 4) 
 #define MODE_13BIT            (1 << 4)
-#define 0.25HZ_REFRESH        (0 << 6)
-#define 1HZ_REFRESH           (1 << 6)
-#define 4HZ_REFRESH           (2 << 6)
-#define 8HZ_REFRESH           (3 << 6)
+#define REFRESH_025HZ         (0 << 6)
+#define REFRESH_1HZ           (1 << 6)
+#define REFRESH_4HZ           (2 << 6)
+#define REFRESH_8HZ           (3 << 6)
 #define SHUTDOWN_MODE_ENABLE  (1 << 8)
 #define SHUTDOWN_MODE_DISABLE (0 << 8)
 #define INTERRUPT_MODE        (1 << 9)
@@ -44,6 +50,20 @@ Kelvin,
 #define ALERT_ON_6_FAULT      (3 << 11)
 #define START_CONVERSION      (1 << 15)
 
+
+/* Default values for configuring the registers */
+#define TLOW_REG_DEFAULT 25
+#define THIGH_REG_DEFAULT 35
+
+/* Macros for queue setup */
+#define TEMP_SENS_QUEUE  "/temp_sens"
+#define TEMP_QUEUE_SIZE  10
+
+/* Macros for timer setup */
+#define CLOCK_TO_USE               CLOCK_REALTIME
+#define SIGNAL_NOTIFICATION_METHOD SIGEV_SIGNAL
+#define SIGNAL_NO                  SIGRTMIN
+#define TIME_IN_NANOSEC            100000000  //100msec  
 
 /* The functions that are used to communicate to the i2c temperature sensor TMP102 */
 
@@ -61,7 +81,8 @@ int temp_i2c_init(uint8_t);
 * Function name:- temp_i2c_write_to_reg
 * Description:- This function takes the file descriptor as parameter which is used to
 *               write to a file. It writes the data to the temperature sensor register 
-*               which is described in parameter.
+*               which is described in parameter. For writing the data to THIGH or TLOW
+*               regiser the data to write should be in Celsius.
 * @param:- int (file descriptor), uint8_t (temperature sensor register address), 
 *          int16_t (data to write)
 * @return:- void
@@ -93,3 +114,12 @@ uint16_t temp_i2c_read_from_reg(int, uint8_t);
 float read_temperature(int, uint8_t, int);
 
 
+/* 
+* Function name:- temperature_monitor
+* Description:- This function is the thread which creates its queue, sets the timer for taking
+*               temperature readings at regular intervals, sets the signal handler, get the
+*               temperature reading and send it to logger and to user if requested.
+* @param:- void* (information structure passed by the main task)
+* @return:- void
+*/
+void *temperature_monitor(void*);

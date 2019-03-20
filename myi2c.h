@@ -17,6 +17,6 @@
 //char fileName[50];
 int myi2cInit(uint8_t slaveAdd);
 uint8_t* myi2cRead(int, uint8_t);
-int myi2cWrite(int,uint8_t,uint8_t);
+int myi2cWrite(int,uint8_t[],uint8_t);
 
 

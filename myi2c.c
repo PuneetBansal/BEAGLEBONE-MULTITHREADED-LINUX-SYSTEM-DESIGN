@@ -1,4 +1,4 @@
-ref:https://elinux.org/Interfacing_with_I2C_Devices
+// ref:https://elinux.org/Interfacing_with_I2C_Devices
 
 #include<linux/i2c.h>
 #include<linux/i2c-dev.h>
@@ -11,7 +11,7 @@ ref:https://elinux.org/Interfacing_with_I2C_Devices
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include "myi2c.h";
+#include "myi2c.h"
 
 int myi2cInit(uint8_t slaveAdd)
 {
@@ -36,8 +36,8 @@ return fileDescrip;
 
 uint8_t* myi2cRead(int fileDescrip,uint8_t len)
 {
-uint8_t readBuffer[2];
-if (read(fileDescrip,buf,len) != len)
+static uint8_t readBuffer[2];
+if (read(fileDescrip,readBuffer,len) != len)
 {
   perror("Read failed");
   return NULL;
