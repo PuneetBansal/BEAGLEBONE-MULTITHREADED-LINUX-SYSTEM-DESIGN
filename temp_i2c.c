@@ -20,7 +20,7 @@
 /************* The user library containing required information *************/
 #include "temp_i2c.h"
 #include "myi2c.h"
-#include "logger.h"
+//#include "logger.h"
 
 
 int temp_i2c_init(uint8_t slave_addr)
@@ -33,7 +33,7 @@ void temp_i2c_write_to_reg(int file_des, uint8_t temp_sens_reg_to_write, int16_t
 {
 	uint8_t buffer[3];
 	buffer[0] = temp_sens_reg_to_write;
-	uint16_t config_reg;
+	uint16_t config_reg, config_value;
 
 	switch(temp_sens_reg_to_write)
 	{
@@ -44,7 +44,8 @@ void temp_i2c_write_to_reg(int file_des, uint8_t temp_sens_reg_to_write, int16_t
 
 	// If there is write to config register
 	case CONFIG_REG_ADDR:
-		config_reg = data_to_write;
+		config_value = temp_i2c_read_from_reg(file_des, CONFIG_REG_ADDR);
+		config_reg = config_value | data_to_write;
 		buffer[1] = config_reg >> 8;
 		buffer[2] = config_reg << 8;
 	break;
@@ -69,13 +70,15 @@ void temp_i2c_write_to_reg(int file_des, uint8_t temp_sens_reg_to_write, int16_t
 uint16_t temp_i2c_read_from_reg(int file_des, uint8_t temp_sens_to_read_from)
 {
 	uint8_t* buffer;
+	uint16_t reg_val;
 	if(myi2cWrite(file_des, &temp_sens_to_read_from, sizeof(temp_sens_to_read_from)) < 0)
 	{
-		printf("%s",__func__);
+		printf("%s\n",__func__);
 		perror("Write failed: ");
 	}
 	buffer = myi2cRead(file_des, 2);
-	return ((uint16_t)buffer[0]<<8 + buffer[1]);
+	printf("Value of buffer in %s is %x-%x\n",__func__,buffer[0],buffer[1]);
+	return ((uint16_t)buffer[0] << 8 | buffer[1]);
 }
 
 
@@ -86,12 +89,15 @@ float read_temperature(int file_des, uint8_t temp_sens_to_read_from, int tempera
 	
 	if(temp_sens_to_read_from == CONFIG_REG_ADDR)
 	{
-		printf("%s::Config register values are not temperature");
+		printf("%s::Config register values are not temperature",__func__);
 		exit(1);
 	}
 	temperature = temp_i2c_read_from_reg(file_des, temp_sens_to_read_from);
+	printf("temperature = %x\n",temperature);	
 	temperature = temperature >> 4;
+	printf("temperature = %x\n",temperature);	
 	final_temp = temperature * 0.0625;
+	printf("final_temp = %d\n",final_temp);
 	switch(temperature_unit)
 	{
 	case Celsius:
@@ -109,7 +115,7 @@ float read_temperature(int file_des, uint8_t temp_sens_to_read_from, int tempera
 }
 
 
-void *temperature_monitor(void* information)
+/*void *temperature_monitor(void* information)
 {
 	//write the configurations in temperature sensor
 	int file_fd;                                              //get this from the main task
@@ -205,7 +211,7 @@ void *temperature_monitor(void* information)
 	{
 		data_received = (temp_msg*)buffer;
 	}
-	if((strcmp(data_recevied->source,"socket"))==0)s
+	if((strcmp(data_recevied->source,"socket"))==0)
 	{
 		temperature = read_temperature(file_fd, TEMP_REG_ADDR, data_received->temperature_unit)
 		//write the source as temperature, write the value of temperature and temperature unit
@@ -225,4 +231,4 @@ mqd_t mqueue_init(char* queue_name, int queue_size, int message_size)
 	msg_q_des = mq_open(queue_name, O_CREAT | O_RDWR, 0666, &queue_attr);
 
 	return msg_q_des;
-}
+}*/

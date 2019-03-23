@@ -43,6 +43,7 @@ if (read(fileDescrip,readBuffer,len) != len)
   return NULL;
   //check whether we need to return or not.
 }
+printf("Value of buffer is %x-%x\n",readBuffer[0],readBuffer[1]);
 return readBuffer;
 }
 
