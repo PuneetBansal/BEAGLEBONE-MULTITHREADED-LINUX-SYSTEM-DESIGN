@@ -8,7 +8,7 @@
 #define LOGQUEUENAME    "/logqueue"
 
 /* Message queue size for all the tasks */
-#define MAIN_QUEUE_SIZE   20
+#define MAIN_QUEUE_SIZE   10
 #define TEMP_QUEUE_SIZE   5
 #define LIGHT_QUEUE_SIZE  5
 #define SOCKET_QUEUE_SIZE 5
