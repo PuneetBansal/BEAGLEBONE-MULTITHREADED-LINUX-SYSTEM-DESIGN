@@ -1,4 +1,5 @@
 #include <mqueue.h>
+#include <stdbool.h>
 
 /* Message queues for all the tasks */
 #define MAINQUEUENAME   "/mainqueue"
@@ -14,11 +15,25 @@
 #define SOCKET_QUEUE_SIZE 5
 #define LOG_QUEUE_SIZE    10
 
+enum messageType{
+	request = 0,
+	update,
+};
+
+enum status{
+	fail,
+	success,
+	init_success,
+	init_failure,
+};
 
 /* Message queue structure to send to the tasks */
 typedef struct
 {
-    int data;
+    char source[20];
+	bool messageType;
+	int status;
+	int unit;
 }mainStruct;
 
 typedef struct{

@@ -6,25 +6,95 @@
 #include <string.h>
 #include <signal.h>
 #include <time.h>
+#include <stdbool.h>
 
 /*User defined headers*/
 #include "maintask.h"
 
 pthread_t tempSensorTask,lightSensorTask,loggerTask,socketTask;
 static void signal_handler(int , siginfo_t *, void*);
+bool measureTemperature = true;
 
 static void* tempSensorRoutine(void *dataObj)
 {
-    printf("Entered tempSensorTask\n");
-    mainStruct dataToSend;
-    dataToSend.data=55;
-    mqd_t tempToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(mainStruct));
+	mainStruct dataToSend;
+	int init_status = init_success;
+	struct sigevent tempEvent;
+	struct sigaction tempAction;
+	struct itimerspec timerSpec;
+	timer_t tempTimer;
+	printf("Entered tempSensorTask\n");
+	//* Initialize temperature sensor here with config register, TLOW and THIGH register values.
+	//* if init fails init_status = fail else init_status = success;
+    strcpy(dataToSend.source,"temperature");
+	dataToSend.status       = init_status;
+	dataToSend.messageType  = update;
+	
+	//printf("Source test = %s - %ld\n",dataToSend.source,sizeof(dataToSend));
+    mqd_t tempToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(dataToSend));
     if(tempToMain < 0)
     {
 		//printf("%s",__func__);
         perror("Temp queue creation failed");
     }
-    mq_send(tempToMain,(char*)&dataToSend,sizeof(mainStruct),0);    
+    int x = mq_send(tempToMain,(char*)&dataToSend,sizeof(dataToSend),0);
+	if(x < 0)
+	{
+		perror("Sending data failed");
+	}
+	
+	//if init_status == fail then pthread exit after sending the message to main.   
+
+	//Register signal handler for a signal
+	tempAction.sa_flags     = SA_SIGINFO;
+    tempAction.sa_sigaction = signal_handler;
+	if((sigaction(SIGRTMIN + 4, &tempAction, NULL))<0)
+	{
+		perror("Failed setting signal handler for temp measurement");
+	}
+	
+	//Assigning signal to timer
+	tempEvent.sigev_notify             = SIGEV_SIGNAL;
+	tempEvent.sigev_signo              = SIGRTMIN + 4;
+	tempEvent.sigev_value.sival_ptr    = &tempTimer;
+	if((timer_create(CLOCK_REALTIME, &tempEvent, &tempTimer)) < 0)
+	{
+		perror("Timer creation failed for temperature task");
+		exit(1);
+	}
+
+	//Setting the time and starting the timer
+	timerSpec.it_interval.tv_nsec = 100000000;
+	timerSpec.it_interval.tv_sec  = 0;
+	timerSpec.it_value.tv_nsec    = 100000000;
+	timerSpec.it_value.tv_sec     = 0;
+
+	if((timer_settime(tempTimer, 0, &timerSpec, NULL)) < 0)
+	{
+		perror("Starting timer in temperature task failed");
+		exit(1);
+	}
+	
+	strcpy(dataToSend.source,"temperature");
+	int y = 0;
+	while(1)
+	{
+		if(measureTemperature)
+		{
+			printf("Sending Temperature\n");
+			//Take temperaure measurement
+			// Send it to logger.
+			measureTemperature = false;
+			//Sending heartbeat message
+			dataToSend.messageType = update;
+			dataToSend.status = y;
+			y++;
+			mq_send(tempToMain,(char*)&dataToSend,sizeof(mainStruct),0);
+			if(y > 3)
+				break;
+		}
+	}
+	timer_delete(tempTimer);
     pthread_exit(NULL);
 }
 
@@ -33,7 +103,9 @@ static void* lightSensorRoutine(void *dataObj)
     printf("Entered lightSensorRoutine\n");
 
     mainStruct dataToSend;
-    dataToSend.data=22;
+    strcpy(dataToSend.source,"light");
+	dataToSend.messageType = request;
+	dataToSend.status = init_failure;
     mqd_t lightToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(mainStruct));
     if(lightToMain < 0)
     {
@@ -143,6 +215,7 @@ int main()
 	sigevTemp.sigev_notify            = SIGEV_SIGNAL;
 	sigevTemp.sigev_signo             = SIGRTMIN;
 	sigevTemp.sigev_value.sival_ptr   = &timerTemp;
+	printf("Check this - %p <-------------------------\nf",&timerTemp);
 	
 	sigevLight.sigev_notify           = SIGEV_SIGNAL;
 	sigevLight.sigev_signo            = SIGRTMIN + 1;
@@ -179,23 +252,23 @@ int main()
 
 	timerConfigTemp.it_interval.tv_nsec = 0;
 	timerConfigTemp.it_interval.tv_sec  = 0;
-	timerConfigTemp.it_value.tv_nsec    = 10000000;
-	timerConfigTemp.it_value.tv_sec     = 0;
+	timerConfigTemp.it_value.tv_nsec    = 0;
+	timerConfigTemp.it_value.tv_sec     = 1;
 
 	timerConfigLight.it_interval.tv_nsec = 0;
 	timerConfigLight.it_interval.tv_sec  = 0;
-	timerConfigLight.it_value.tv_nsec    = 0;//10000000;
-	timerConfigLight.it_value.tv_sec     = 3;
+	timerConfigLight.it_value.tv_nsec    = 0;
+	timerConfigLight.it_value.tv_sec     = 1;
 
 	timerConfigLog.it_interval.tv_nsec = 0;
 	timerConfigLog.it_interval.tv_sec  = 0;
-	timerConfigLog.it_value.tv_nsec    = 10000000;
-	timerConfigLog.it_value.tv_sec     = 0;
+	timerConfigLog.it_value.tv_nsec    = 0;
+	timerConfigLog.it_value.tv_sec     = 1;
 
 	timerConfigSocket.it_interval.tv_nsec = 0;
 	timerConfigSocket.it_interval.tv_sec  = 0;
-	timerConfigSocket.it_value.tv_nsec    = 10000000;
-	timerConfigSocket.it_value.tv_sec     = 0;
+	timerConfigSocket.it_value.tv_nsec    = 0;
+	timerConfigSocket.it_value.tv_sec     = 1;
 
 	if((timer_settime(timerTemp, 0, &timerConfigTemp, NULL)) < 0)
 	{
@@ -218,19 +291,22 @@ int main()
 		exit(1);
 	}
 
-	
     while(1)
     {
+		//printf("Receivin\n");
         int ret=mq_receive(mainQueue, (char*)&dataToReceive, sizeof(mainStruct),0);
-        if(ret==-1)
+        if(ret>-1)
         {
-            perror("Error receving data from main queue");
-        }
-        printf("Data received from main queue %d\n",dataToReceive.data);
-		if((timer_settime(timerLight, 0, &timerConfigLight, NULL)) < 0)
-		{
-			perror("Light Timer set failed");
-			exit(1);
+			printf("Data source from main queue %s\n",dataToReceive.source);
+			printf("Data success = %d\n",dataToReceive.status);
+			printf("Data mesage_type = %d\n",dataToReceive.messageType);
+			if((strcmp(dataToReceive.source,"temperature"))==0 && dataToReceive.messageType == update && dataToReceive.status == success)
+			{
+				if((timer_settime(timerTemp, 0, &timerConfigTemp, NULL)) < 0)
+				{
+					perror("Temp Timer set failed");
+				}
+			}
 		}
     }
     
@@ -258,6 +334,10 @@ static void signal_handler(int sig, siginfo_t *si, void *uc)
 		break;
 	case 37:
 		printf("SIGRTMIN+3 signal is received\n");
+		break;
+	case 38:
+		printf("SIGRTMIN+4 signal is received\n");
+		measureTemperature = true;
 		break;
 	}
 }
