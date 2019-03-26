@@ -15,24 +15,24 @@
 #define SOCKET_QUEUE_SIZE 5
 #define LOG_QUEUE_SIZE    10
 
-enum messageType{
-	request = 0,
-	update,
-};
+typedef enum {
+	request,
+	update
+}messageTypeEnum;
 
-enum status{
+typedef enum{
 	fail,
 	success,
 	init_success,
 	init_failure,
-};
+}statusEnum;
 
 /* Message queue structure to send to the tasks */
 typedef struct
 {
     char source[20];
-	bool messageType;
-	int status;
+	messageTypeEnum messageType;
+	statusEnum status;
 	int unit;
 }mainStruct;
 

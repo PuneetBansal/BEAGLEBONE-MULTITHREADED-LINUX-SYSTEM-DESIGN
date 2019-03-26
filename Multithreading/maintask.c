@@ -14,6 +14,8 @@
 pthread_t tempSensorTask,lightSensorTask,loggerTask,socketTask;
 static void signal_handler(int , siginfo_t *, void*);
 bool measureTemperature = true;
+bool measureLight=false;
+bool loggerHeartBeat=false;
 
 static void* tempSensorRoutine(void *dataObj)
 {
@@ -27,7 +29,7 @@ static void* tempSensorRoutine(void *dataObj)
 	//* Initialize temperature sensor here with config register, TLOW and THIGH register values.
 	//* if init fails init_status = fail else init_status = success;
     strcpy(dataToSend.source,"temperature");
-	dataToSend.status       = init_status;
+	dataToSend.status       = init_status; //* We are to send the init status only after thi task is properly initialised.
 	dataToSend.messageType  = update;
 	
 	//printf("Source test = %s - %ld\n",dataToSend.source,sizeof(dataToSend));
@@ -64,7 +66,7 @@ static void* tempSensorRoutine(void *dataObj)
 	}
 
 	//Setting the time and starting the timer
-	timerSpec.it_interval.tv_nsec = 100000000;
+	timerSpec.it_interval.tv_nsec = 100000000; //To get the value from sensor every 100 ms
 	timerSpec.it_interval.tv_sec  = 0;
 	timerSpec.it_value.tv_nsec    = 100000000;
 	timerSpec.it_value.tv_sec     = 0;
@@ -103,9 +105,46 @@ static void* lightSensorRoutine(void *dataObj)
     printf("Entered lightSensorRoutine\n");
 
     mainStruct dataToSend;
+	 
+	/*Initialising Timer*/
+    struct sigevent lightEvent;	
+	struct sigaction lightAction;
+	struct itimerspec lightTimerSpec;
+	timer_t lightTimer;
+
+	lightAction.sa_flags = SA_SIGINFO;
+	lightAction.sa_sigaction = signal_handler;		
+	
+	if(sigaction(SIGRTMIN + 5 , &lightAction, NULL)<0)
+	{
+		perror("Light sensor, timer handler initialisation failed");
+	}	
+	
+	lightEvent.sigev_notify = SIGEV_SIGNAL;
+    lightEvent.sigev_signo = SIGRTMIN + 5;
+    lightEvent.sigev_value.sival_ptr = &lightTimer;
+
+	if((timer_create(CLOCK_REALTIME, &lightEvent, &lightTimer)) < 0)
+	{
+		perror("Timer creation failed for temperature task");
+		exit(1);
+	}
+
+	lightTimerSpec.it_interval.tv_nsec = 100000000; //To get the value after every 100 ms
+	lightTimerSpec.it_interval.tv_sec  = 0;
+	lightTimerSpec.it_value.tv_nsec    = 100000000;
+	lightTimerSpec.it_value.tv_sec     = 0;
+
+	if(timer_settime(lightTimer,0,&lightTimerSpec,NULL)<0)
+	{
+		perror("Light sensor timer settime failed");
+		exit(1);
+	}
+
+
     strcpy(dataToSend.source,"light");
-	dataToSend.messageType = request;
-	dataToSend.status = init_failure;
+	dataToSend.messageType = update;
+	dataToSend.status = init_success;
     mqd_t lightToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(mainStruct));
     if(lightToMain < 0)
     {
@@ -113,8 +152,27 @@ static void* lightSensorRoutine(void *dataObj)
         perror("Light queue creation failed");
     }
     mq_send(lightToMain,(char*)&dataToSend,sizeof(mainStruct),0);
+    
+ int y=0;
 
-    pthread_exit(NULL);
+ while(1)
+ {
+	if(measureLight)
+	{
+		printf("Sednign light value to logger and updating heart beat to main\n");
+		measureLight=false;
+		//take the light sensor value here and send it to logger task
+		dataToSend.messageType = update;
+		dataToSend.status = success;	
+		mq_send(lightToMain,(char*)&dataToSend,sizeof(mainStruct),0);	
+		y++;
+	}
+ if(y>3)
+ break;
+ }
+
+    timer_delete(lightTimer);
+	pthread_exit(NULL);
 }
 
 static void* socketRoutine(void *dataObj)
@@ -126,7 +184,77 @@ static void* socketRoutine(void *dataObj)
 static void* loggerRoutine(void *dataObj)
 {
     printf("Entered loggerRoutine\n");
-    pthread_exit(NULL);
+    printf("Entered lightSensorRoutine\n");
+
+    mainStruct dataToSend;
+	 
+	/*Initialising Timer*/
+    struct sigevent loggerEvent;	
+	struct sigaction loggerAction;
+	struct itimerspec loggerTimerSpec;
+	timer_t loggerTimer;
+
+	loggerAction.sa_flags = SA_SIGINFO;
+	loggerAction.sa_sigaction = signal_handler;		
+	
+	if(sigaction(SIGRTMIN + 6 , &loggerAction, NULL)<0)
+	{
+		perror("Logger, timer handler initialisation failed");
+	}	
+	
+	loggerEvent.sigev_notify = SIGEV_SIGNAL;
+    loggerEvent.sigev_signo = SIGRTMIN + 6;
+    loggerEvent.sigev_value.sival_ptr = &loggerTimer;
+
+	if((timer_create(CLOCK_REALTIME, &loggerEvent, &loggerTimer)) < 0)
+	{
+		perror("Timer creation failed for logger task");
+		exit(1);
+	}
+
+	loggerTimerSpec.it_interval.tv_nsec = 0;//100000000; //To get the value after every 100 ms
+	loggerTimerSpec.it_interval.tv_sec  = 2;
+	loggerTimerSpec.it_value.tv_nsec    = 0;//100000000;
+	loggerTimerSpec.it_value.tv_sec     = 2;
+
+	if(timer_settime(loggerTimer,0,&loggerTimerSpec,NULL)<0)
+	{
+		perror("logger timer settime failed");
+		exit(1);
+	}
+
+
+    strcpy(dataToSend.source,"logger");
+	dataToSend.messageType = update;
+	dataToSend.status = init_success;
+    mqd_t loggerToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(mainStruct));
+    if(loggerToMain < 0)
+    {
+		//printf("%s",__func__);
+        perror("logger queue creation failed");
+    }
+    mq_send(loggerToMain,(char*)&dataToSend,sizeof(mainStruct),0);
+    
+ int y=0;
+
+ while(1)
+ {
+	if(loggerHeartBeat)
+	{
+		printf("Updating logger heart beat to main\n");
+		loggerHeartBeat=false;
+		
+		dataToSend.messageType = update;
+		dataToSend.status = success;	
+		mq_send(loggerToMain,(char*)&dataToSend,sizeof(mainStruct),0);	
+		y++;
+	}
+ if(y>3)
+ break;
+ }
+
+    timer_delete(loggerTimer);
+	pthread_exit(NULL);
 }
 
 
@@ -263,7 +391,7 @@ int main()
 	timerConfigLog.it_interval.tv_nsec = 0;
 	timerConfigLog.it_interval.tv_sec  = 0;
 	timerConfigLog.it_value.tv_nsec    = 0;
-	timerConfigLog.it_value.tv_sec     = 1;
+	timerConfigLog.it_value.tv_sec     = 6;
 
 	timerConfigSocket.it_interval.tv_nsec = 0;
 	timerConfigSocket.it_interval.tv_sec  = 0;
@@ -307,6 +435,22 @@ int main()
 					perror("Temp Timer set failed");
 				}
 			}
+			else if((strcmp(dataToReceive.source,"light"))==0 && dataToReceive.messageType == update && dataToReceive.status == success)
+			{
+				if((timer_settime(timerLight, 0, &timerConfigLight, NULL)) < 0)
+				{
+					perror("Light Timer set failed");
+				}
+			}
+
+			else if((strcmp(dataToReceive.source,"logger"))==0 && dataToReceive.messageType == update && dataToReceive.status == success)
+			{
+				if((timer_settime(timerLog, 0, &timerConfigLog, NULL)) < 0)
+				{
+					perror("Logger Timer set failed");
+				}
+			}
+
 		}
     }
     
@@ -338,6 +482,14 @@ static void signal_handler(int sig, siginfo_t *si, void *uc)
 	case 38:
 		printf("SIGRTMIN+4 signal is received\n");
 		measureTemperature = true;
+		break;
+	case 39:
+		printf("SIGRTMIN+5(lighTimerHandler) signal is received\n");
+		measureLight = true;
+		break;
+	case 40:
+		printf("SIGRTMIN+6(LoggerTimerHandler) signal is received\n");
+		loggerHeartBeat = true;
 		break;
 	}
 }
