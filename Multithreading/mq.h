@@ -33,7 +33,7 @@ typedef struct
     char source[20];
 	messageTypeEnum messageType;
 	statusEnum status;
-	int unit;
+	char unit[20];
 }mainStruct;
 
 typedef struct{
@@ -44,8 +44,13 @@ typedef struct{
 
 }lightStruct;
 
-typedef struct{
 
+typedef struct{
+char* source;
+statusEnum status;
+char* message;	
+float value;
+char unit[20];
 }logStruct;
 
 typedef struct{

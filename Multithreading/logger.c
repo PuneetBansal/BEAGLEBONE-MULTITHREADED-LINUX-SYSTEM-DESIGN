@@ -1,74 +1,59 @@
-/************************************************************************************************
-* File name   : logger.c                                                                        *
-* Authors     : Nachiket Kelkar and Puneet Bansal                                               *
-* Description : The functions used for initialising the file and writing data to file. The      *
-*               message queue is setup for getting the required readings from tasks and writing *
-*               it to a log file.                                                               *
-* Tools used  : GNU make.                                                                       *
-************************************************************************************************/
-
-/************ The standard C libraries included for functionality ************/
-#include <stdio.h>
-#include <time.h>
-
-/************* The user library containing required information *************/
 #include "logger.h"
-#include "temp_i2c.h"
 
 
-/* Function prototypes */
-FILE* logfile_init(char* log_file)
+void logToFile(logStruct dataToReceive)
 {
-	FILE *logging;
-	logging = fopen(log_file,"a");
-	return log_file;	
-}
-
-
-void logfile_write(FILE* log_file, logger_msg log_struct)
-{
-	if((strcmp(log_struct.source,"temperature"))==0)
-	{
-		if(log_struct.message_type == success)
-		{
-			fprintf(log_file, "[%s] %f",timestamp(), log_struct.value);
-			switch(log_struct.unit)
+    FILE *logging;
+	printf("value of timestamp in logtofile function is %s\n",printTimeStamp());
+    if(strcmp(dataToReceive.source,"temperature")==0)
+    {
+        logging = fopen(LOGFILE_NAME,"a");
+       if(dataToReceive.status==success)
+       {            
+            fprintf(logging,"%s %s value is %f\n",printTimeStamp(),dataToReceive.source,dataToReceive.value);
+            
+            if(strcmp(dataToReceive.unit,"Celcius")==0)
 			{
-			case Celsius:
-				fprintf(log_file, " Celsius\n");
-				break;
-			case Fahrenheit:
-				fprintf(log_file, " Fahrenheit\n");
-				break;
-			case Kelvin:
-				fprintf(log_file, " Kelvin\n");
-				break;
-			}
+                fprintf(logging, " Celsius\n");
+            }
+			else if(strcmp(dataToReceive.unit,"Fahrenheit")==0)
+			{
+                fprintf(logging, " Fahrenheit\n");
+            }
+            else if(strcmp(dataToReceive.unit,"Kelvin")==0)
+			{
+                fprintf(logging, " Kelvin\n");
+            }
+					
 		}
-		else
-		{
-			fprintf(log_file, "(Failure message) - %s",log_struct.message);
-		}
-	}
-	else if((strcmp(log_struct.source,"light"))==0)
-	{
-		//See if it a success or failure message and log the file accordingly.
-	}
+       else
+       {
+           fprintf(logging, "%s (Failure message) - %s\n",printTimeStamp(),dataToReceive.message);
+       }
+    fclose(logging);
+    }
+
+    if(strcmp(dataToReceive.source,"light")==0)
+    {
+        logging = fopen(LOGFILE_NAME,"a");
+       if(dataToReceive.status==success)
+       {            
+            fprintf(logging,"%s %s value is %f\n",printTimeStamp(),dataToReceive.source,dataToReceive.value);
+        }
+       else
+       {
+           fprintf(logging, "%s (Failure message) - %s\n",printTimeStamp(),dataToReceive.message);
+       }
+    fclose(logging);
+    }
 }
 
-
-//timestamp function referenced from https://stackoverflow.com/questions/3673226/how-to-print-time-in-format-2009-08-10-181754-811
-char* timestamp()
+char* printTimeStamp()
 {
-	time_t timer;	
-	char* time_stamp = (char*)malloc(20);
-	struct tm *time_struct;
-
-	time(&timer);
-	time_struct = localtime(&timer);
-	strftime(time_stamp, 20, "%Y-%m-%d %H-%M-%S", time_struct);
-	return time_stamp;
+    char* time_stamp=malloc(40);
+    struct timespec thTimeSpec;
+    clock_gettime(CLOCK_REALTIME, &thTimeSpec);
+    sprintf(time_stamp,"[s: %ld, ns: %ld]",thTimeSpec.tv_sec,thTimeSpec.tv_nsec);
+    printf("Value of time_stamp is %s",time_stamp);
+    return time_stamp;
 }
-
-
-//Create a logger function to be executed as a logger task

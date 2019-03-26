@@ -19,27 +19,39 @@ bool loggerHeartBeat=false;
 
 static void* tempSensorRoutine(void *dataObj)
 {
-	mainStruct dataToSend;
+	mainStruct dataToSendToMain;
+	logStruct dataToSendToLogger;
+
 	int init_status = init_success;
 	struct sigevent tempEvent;
 	struct sigaction tempAction;
 	struct itimerspec timerSpec;
 	timer_t tempTimer;
+
 	printf("Entered tempSensorTask\n");
 	//* Initialize temperature sensor here with config register, TLOW and THIGH register values.
 	//* if init fails init_status = fail else init_status = success;
-    strcpy(dataToSend.source,"temperature");
-	dataToSend.status       = init_status; //* We are to send the init status only after thi task is properly initialised.
-	dataToSend.messageType  = update;
+    
+	strcpy(dataToSendToMain.source,"temperature");
+	dataToSendToMain.status       = init_status; //* We are to send the init status only after thi task is properly initialised.
+	dataToSendToMain.messageType  = update;
 	
 	//printf("Source test = %s - %ld\n",dataToSend.source,sizeof(dataToSend));
-    mqd_t tempToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(dataToSend));
-    if(tempToMain < 0)
+    mqd_t tempToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(dataToSendToMain));
+	mqd_t tempToLogger = mqueue_init(LOGQUEUENAME,LOG_QUEUE_SIZE,sizeof(dataToSendToLogger));
+    
+	if(tempToMain < 0)
     {
 		//printf("%s",__func__);
         perror("Temp queue creation failed");
     }
-    int x = mq_send(tempToMain,(char*)&dataToSend,sizeof(dataToSend),0);
+     
+	if(tempToLogger <0)
+	{
+		perror("TempToLog queue creation failed");
+	}
+	
+	int x = mq_send(tempToMain,(char*)&dataToSendToMain,sizeof(dataToSendToMain),0);
 	if(x < 0)
 	{
 		perror("Sending data failed");
@@ -77,7 +89,7 @@ static void* tempSensorRoutine(void *dataObj)
 		exit(1);
 	}
 	
-	strcpy(dataToSend.source,"temperature");
+	strcpy(dataToSendToMain.source,"temperature");
 	int y = 0;
 	while(1)
 	{
@@ -88,13 +100,19 @@ static void* tempSensorRoutine(void *dataObj)
 			// Send it to logger.
 			measureTemperature = false;
 			//Sending heartbeat message
-			dataToSend.messageType = update;
-			dataToSend.status = y;
+			dataToSendToMain.messageType = update;
+			dataToSendToMain.status = y;
+			
+			dataToSendToLogger.status = success;
+			dataToSendToLogger.source= "temperature";
+			dataToSendToLogger.value = y;
+
+			mq_send(tempToMain,(char*)&dataToSendToMain,sizeof(mainStruct),0);
+			mq_send(tempToLogger,(char*)&dataToSendToLogger,sizeof(logStruct),0);
 			y++;
-			mq_send(tempToMain,(char*)&dataToSend,sizeof(mainStruct),0);
-			if(y > 3)
-				break;
 		}
+		//if(y > 3)
+		//		break;
 	}
 	timer_delete(tempTimer);
     pthread_exit(NULL);
@@ -104,7 +122,8 @@ static void* lightSensorRoutine(void *dataObj)
 {
     printf("Entered lightSensorRoutine\n");
 
-    mainStruct dataToSend;
+    mainStruct dataToSendToMain;
+	logStruct dataTOSendTOLogger;
 	 
 	/*Initialising Timer*/
     struct sigevent lightEvent;	
@@ -142,16 +161,22 @@ static void* lightSensorRoutine(void *dataObj)
 	}
 
 
-    strcpy(dataToSend.source,"light");
-	dataToSend.messageType = update;
-	dataToSend.status = init_success;
+    strcpy(dataToSendToMain.source,"light");
+	dataToSendToMain.messageType = update;
+	dataToSendToMain.status = init_success;
     mqd_t lightToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(mainStruct));
+	mqd_t lightToLogger = mqueue_init(LOGQUEUENAME,LOG_QUEUE_SIZE,sizeof(logStruct));
     if(lightToMain < 0)
     {
 		//printf("%s",__func__);
         perror("Light queue creation failed");
     }
-    mq_send(lightToMain,(char*)&dataToSend,sizeof(mainStruct),0);
+    if(lightToLogger<0)
+	{
+		perror("LightToLogger queue creation failed");
+	}
+
+	mq_send(lightToMain,(char*)&dataToSendToMain,sizeof(mainStruct),0);
     
  int y=0;
 
@@ -159,16 +184,22 @@ static void* lightSensorRoutine(void *dataObj)
  {
 	if(measureLight)
 	{
-		printf("Sednign light value to logger and updating heart beat to main\n");
+		printf("Sending light value to logger and updating heart beat to main\n");
 		measureLight=false;
 		//take the light sensor value here and send it to logger task
-		dataToSend.messageType = update;
-		dataToSend.status = success;	
-		mq_send(lightToMain,(char*)&dataToSend,sizeof(mainStruct),0);	
+		dataToSendToMain.messageType = update;
+		dataToSendToMain.status = success;	
+		
+		dataTOSendTOLogger.status = success;
+		dataTOSendTOLogger.source= "light";
+		dataTOSendTOLogger.value = y;
+		
+		mq_send(lightToMain,(char*)&dataToSendToMain,sizeof(mainStruct),0);	
+		mq_send(lightToLogger,(char*)&dataTOSendTOLogger,sizeof(logStruct),0);
 		y++;
 	}
- if(y>3)
- break;
+ //if(y>3)
+ //break;
  }
 
     timer_delete(lightTimer);
@@ -187,6 +218,7 @@ static void* loggerRoutine(void *dataObj)
     printf("Entered lightSensorRoutine\n");
 
     mainStruct dataToSend;
+	logStruct dataToReceive;
 	 
 	/*Initialising Timer*/
     struct sigevent loggerEvent;	
@@ -228,29 +260,51 @@ static void* loggerRoutine(void *dataObj)
 	dataToSend.messageType = update;
 	dataToSend.status = init_success;
     mqd_t loggerToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(mainStruct));
+	
     if(loggerToMain < 0)
     {
 		//printf("%s",__func__);
         perror("logger queue creation failed");
     }
-    mq_send(loggerToMain,(char*)&dataToSend,sizeof(mainStruct),0);
-    
- int y=0;
+	mqd_t loggerQueue = mqueue_init(LOGQUEUENAME,LOG_QUEUE_SIZE,sizeof(logStruct));
+	
+	if(loggerQueue < 0)
+    {
+		//printf("%s",__func__);
+        perror("logger queue creation failed");
+    }	
 
- while(1)
- {
-	if(loggerHeartBeat)
-	{
-		printf("Updating logger heart beat to main\n");
-		loggerHeartBeat=false;
-		
-		dataToSend.messageType = update;
-		dataToSend.status = success;	
-		mq_send(loggerToMain,(char*)&dataToSend,sizeof(mainStruct),0);	
-		y++;
-	}
- if(y>3)
- break;
+	mq_send(loggerToMain,(char*)&dataToSend,sizeof(mainStruct),0);
+	int y=0;
+ 	while(1)
+ 	{
+		if(loggerHeartBeat)
+		{
+			printf("Updating logger heart beat to main\n");
+			loggerHeartBeat=false;
+			dataToSend.messageType = update;
+			dataToSend.status = success;	
+			mq_send(loggerToMain,(char*)&dataToSend,sizeof(mainStruct),0);	
+			y++;
+		}
+		//else if (y>3)
+		//{
+		//	break;			
+		//}
+	 
+	 	else
+		 {
+			 int ret= mq_receive(loggerQueue, (char*)&dataToReceive, sizeof(logStruct),0);
+			 printf("return value of mq_receive in logger is %d\n",ret);
+			if(ret!=-1)
+			{
+				printf("Enteref if of else in logger task (before logtofile)");
+				printf("source in logger queue is %s\n",dataToReceive.source);
+				printf("Received value is %f \n",dataToReceive.value);
+			 	logToFile(dataToReceive);	
+			}
+		 }
+		 
  }
 
     timer_delete(loggerTimer);
@@ -262,7 +316,6 @@ int main()
 {
     mainStruct dataToReceive;
     mainInfoToOthers dataObj;
-
   
     mqd_t mainQueue = mqueue_init(MAINQUEUENAME, MAIN_QUEUE_SIZE, sizeof(mainStruct));
     if(mainQueue < 0)
