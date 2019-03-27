@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "gpio.h"
 #include "temp_i2c.h"
+#include "linux/i2c-dev.h"
+#include "linux/i2c.h"
 
 int main()
 {
@@ -15,5 +17,6 @@ int main()
 	printf("Temperature is %f\n",temperature);
 	config = temp_i2c_read_from_reg(i2c_file_d, CONFIG_REG_ADDR);
 	printf("CONFIG is %x\n",config);
+	size_t x = name_show
 	return 0;
 }

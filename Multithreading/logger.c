@@ -4,7 +4,7 @@
 void logToFile(logStruct dataToReceive)
 {
     FILE *logging;
-	printf("value of timestamp in logtofile function is %s\n",printTimeStamp());
+	//printf("value of timestamp in logtofile function is %s\n",printTimeStamp());
     if(strcmp(dataToReceive.source,"temperature")==0)
     {
         logging = fopen(LOGFILE_NAME,"a");
@@ -54,6 +54,6 @@ char* printTimeStamp()
     struct timespec thTimeSpec;
     clock_gettime(CLOCK_REALTIME, &thTimeSpec);
     sprintf(time_stamp,"[s: %ld, ns: %ld]",thTimeSpec.tv_sec,thTimeSpec.tv_nsec);
-    printf("Value of time_stamp is %s",time_stamp);
+    //printf("Value of time_stamp is %s",time_stamp);
     return time_stamp;
 }
