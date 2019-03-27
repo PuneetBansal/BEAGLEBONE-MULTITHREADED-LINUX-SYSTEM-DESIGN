@@ -37,8 +37,8 @@ typedef struct
 }mainStruct;
 
 typedef struct{
-	char* source;
-	char* unit;
+	char source[20];
+	char unit[20];
 }tempStruct;
 
 typedef struct{
@@ -58,6 +58,7 @@ typedef struct{
 	char* source;
 	float value;
 	char* unit;
+	char message[30];
 }socketStruct;
 
 /*user defined functions*/
