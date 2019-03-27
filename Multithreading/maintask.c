@@ -316,6 +316,9 @@ int main()
 {
     mainStruct dataToReceive;
     mainInfoToOthers dataObj;
+	tempStruct requestForTemp;
+	socketStruct responseToSocket;
+	
 	uint8_t isAlive = 0xFF;
   
     mqd_t mainQueue = mqueue_init(MAINQUEUENAME, MAIN_QUEUE_SIZE, sizeof(mainStruct));
@@ -324,18 +327,23 @@ int main()
         perror("Main queue creation failed");
     }
 
-    mqd_t tempQueue = mqueue_init(TEMPQUEUENAME, TEMP_QUEUE_SIZE, sizeof(mainStruct));
+    mqd_t tempQueue = mqueue_init(TEMPQUEUENAME, TEMP_QUEUE_SIZE, sizeof(tempStruct));
     if(tempQueue < 0)
     {
-        perror("Maintemp queue creation failed");
+        perror("Temp queue creation failed");
     }
 
-    mqd_t lightQueue = mqueue_init(LIGHTQUEUENAME, LIGHT_QUEUE_SIZE, sizeof(mainStruct));
+    mqd_t lightQueue = mqueue_init(LIGHTQUEUENAME, LIGHT_QUEUE_SIZE, sizeof(lightStruct));
     if(lightQueue < 0)
     {
-        perror("Mainlight queue creation failed");
+        perror("Light queue creation failed");
     }
-
+	
+	mqd_t socketQueue = mqueue_init(SOCKETQUEUENAME, SOCKET_QUEUE_SIZE, sizeof(socketStruct));
+	if(socketQueue < 0)
+	{
+		perror("Socket queue creation failed");
+    }
 
     
     //* FIll the data in the structure to send.
@@ -586,14 +594,31 @@ int main()
 			{
 				if(strcmp(dataToReceive.unit,"Celsius")==0 || strcmp(dataToReceive.unit,"Fahrenheit")==0 || strcmp(dataToReceive.unit,"Kelvin")==0)
 				{
-				// check isAlive. 
-				// if temp task is alive populate and send message to Temperature task
+				// check isAlive - if temp task is alive populate and send message to Temperature task
+					if(isAlive & TEMPERATURE_TASK)
+					{
+						strcpy(requestForTemp.source, "main");
+						strcpy(requestForTemp.unit, dataToReceive.unit);
+						int noOfBytesSent = mq_send(tempQueue, (char*)&requestForTemp, sizeof(requestForTemp), 0);
+						if(noOfBytesSent < 0)
+						{
+							perror("Sending request failed");
+						}
+					}
 				// else send temp task not active message to socket task
+					else
+					{
+						strcpy(responseToSocket.source, "main");
+						int noOfBytesSent = mq_send(socketQueue, (char*)&responseToSocket, sizeof(responseToSocket), 0);
+						if(noOfBytesSent < 0)
+						{
+							perror("Sending response failed");
+						}
+					}
 				}
 				else
 				{
-				// check isAlive
-				// if light task is alive populate and send message to Light task
+				// check isAlive - if light task is alive populate and send message to Light task
 				// else send light task not active message to socket task
 				}
 			}

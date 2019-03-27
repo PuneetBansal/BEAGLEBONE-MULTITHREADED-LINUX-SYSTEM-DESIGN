@@ -87,7 +87,7 @@ int temp_i2c_init(uint8_t);
 *               regiser the data to write should be in Celsius.
 * @param:- int (file descriptor), uint8_t (temperature sensor register address), 
 *          int16_t (data to write)
-* @return:- void
+* @return:- int (return error)
 */
 void temp_i2c_write_to_reg(int, uint8_t, int16_t);
 

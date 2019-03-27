@@ -37,7 +37,8 @@ typedef struct
 }mainStruct;
 
 typedef struct{
-
+	char* source;
+	char* unit;
 }tempStruct;
 
 typedef struct{
@@ -46,15 +47,17 @@ typedef struct{
 
 
 typedef struct{
-char* source;
-statusEnum status;
-char* message;	
-float value;
-char unit[20];
+	char* source;
+	statusEnum status;
+	char* message;	
+	float value;
+	char unit[20];
 }logStruct;
 
 typedef struct{
-
+	char* source;
+	float value;
+	char* unit;
 }socketStruct;
 
 /*user defined functions*/
