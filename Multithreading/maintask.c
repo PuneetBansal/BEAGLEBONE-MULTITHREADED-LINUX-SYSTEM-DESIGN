@@ -22,12 +22,15 @@ static void* tempSensorRoutine(void *dataObj)
 {
 	mainStruct dataToSendToMain;
 	logStruct dataToSendToLogger;
+	socketStruct dataToSendToSocket;
+	tempStruct dataReceived;
 
 	int init_status = init_success;
 	struct sigevent tempEvent;
 	struct sigaction tempAction;
 	struct itimerspec timerSpec;
 	timer_t tempTimer;
+	bool sendTempToSocket = false;
 
 	printf("Entered tempSensorTask\n");
 	//* Initialize temperature sensor here with config register, TLOW and THIGH register values.
@@ -38,8 +41,9 @@ static void* tempSensorRoutine(void *dataObj)
 	dataToSendToMain.messageType  = update;
 	
 	//printf("Source test = %s - %ld\n",dataToSend.source,sizeof(dataToSend));
-    mqd_t tempToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(dataToSendToMain));
-	mqd_t tempToLogger = mqueue_init(LOGQUEUENAME,LOG_QUEUE_SIZE,sizeof(dataToSendToLogger));
+    mqd_t tempToMain = mqueue_init(MAINQUEUENAME, MAIN_QUEUE_SIZE, sizeof(dataToSendToMain));
+	mqd_t tempToLogger = mqueue_init(LOGQUEUENAME, LOG_QUEUE_SIZE, sizeof(dataToSendToLogger));
+	mqd_t tempQueue = mqueue_init(SOCKETQUEUENAME, SOCKET_QUEUE_SIZE, sizeof(dataReceived));
     
 	if(tempToMain < 0)
     {
@@ -96,6 +100,7 @@ static void* tempSensorRoutine(void *dataObj)
 	{
 		if(measureTemperature)
 		{
+			int ret = mq_receive();
 			printf("Sending Temperature\n");
 			//Take temperaure measurement
 			// Send it to logger.
