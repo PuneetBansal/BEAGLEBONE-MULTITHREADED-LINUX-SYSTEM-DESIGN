@@ -107,21 +107,19 @@ uint16_t temp_i2c_read_from_reg(int, uint8_t);
 * Function name:- read_temperature
 * Description:- This function takes the file descriptor as parameter which is used to
 *               write to a file. It formats the data of the register passed in the format
-*               of requested temperature unit. As configuration register does not contain
+*               of Celcius unit. As configuration register does not contain
 *               temperature passing config register address will cause an error.
 * @param:- int (file descriptor), uint8_t (temperature sensor register address), 
-*          int (temperature unit)
-* @return:- float (temperature in requested unit)
+* @return:- float (temperature in Celsius)
 */
-float read_temperature(int, uint8_t, int);
+float read_temperature(int, uint8_t);
 
 
 /* 
-* Function name:- temperature_monitor
-* Description:- This function is the thread which creates its queue, sets the timer for taking
-*               temperature readings at regular intervals, sets the signal handler, get the
-*               temperature reading and send it to logger and to user if requested.
-* @param:- void* (information structure passed by the main task)
-* @return:- void
+* Function name:- convert_to_unit
+* Description:- This function takes temperature and unit to conver to and then converts
+*               the value in required temperature unit and returns the value.
+* @param:- float (value to be converted), int (temperature unit to convert to), 
+* @return:- float (temperature in requested unit)
 */
-void *temperature_monitor(void*);
+float convert_to_unit(float, int);

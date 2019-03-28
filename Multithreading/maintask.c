@@ -47,18 +47,26 @@ static void* tempSensorRoutine(void *dataObj)
 	//printf("Source test = %s - %ld\n",dataToSend.source,sizeof(dataToSend));
     mqd_t tempToMain = mqueue_init(MAINQUEUENAME, MAIN_QUEUE_SIZE, sizeof(dataToSendToMain));
 	mqd_t tempToLogger = mqueue_init(LOGQUEUENAME, LOG_QUEUE_SIZE, sizeof(dataToSendToLogger));
-	mqd_t tempQueue = mqueue_init(SOCKETQUEUENAME, SOCKET_QUEUE_SIZE, sizeof(dataReceived));
-    
+	mqd_t tempQueue = mqueue_init(TEMPQUEUENAME, TEMP_QUEUE_SIZE, sizeof(dataReceived));
+	mqd_t socketQueue = mqueue_init(SOCKETQUEUENAME, SOCKET_QUEUE_SIZE, sizeof(dataToSendToSocket));    
+
 	if(tempToMain < 0)
     {
 		//printf("%s",__func__);
-        perror("Temp queue creation failed");
+        perror("TemptoMain queue creation failed");
     }
-     
 	if(tempToLogger <0)
 	{
 		perror("TempToLog queue creation failed");
 	}
+	if(tempQueue < 0)
+    {
+        perror("Temp queue creation failed");
+    }
+	if(socketQueue < 0)
+    {
+        perror("socketQueue creation failed");
+    }
 	
 	int x = mq_send(tempToMain,(char*)&dataToSendToMain,sizeof(dataToSendToMain),0);
 	if(x < 0)
@@ -87,8 +95,8 @@ static void* tempSensorRoutine(void *dataObj)
 	}
 
 	//Setting the time and starting the timer
-	timerSpec.it_interval.tv_nsec = 100000000; //To get the value from sensor every 100 ms
-	timerSpec.it_interval.tv_sec  = 0;
+	timerSpec.it_interval.tv_nsec = 0;//100000000; //To get the value from sensor every 100 ms
+	timerSpec.it_interval.tv_sec  = 2;
 	timerSpec.it_value.tv_nsec    = 100000000;
 	timerSpec.it_value.tv_sec     = 0;
 
@@ -104,8 +112,17 @@ static void* tempSensorRoutine(void *dataObj)
 	{
 		if(measureTemperature)
 		{
-			int ret = mq_receive();
-			printf("Sending Temperature\n");
+			int ret = mq_receive(tempQueue,(char*)&dataReceived,sizeof(dataReceived),0);
+			if(ret < 0)
+			{
+				//perror("No requests received");
+			}
+			else
+			{
+				printf("Task succeded\n");
+				sendTempToSocket = true;
+			}
+			//printf("Sending Temperature\n");
 			//Take temperaure measurement
 			// Send it to logger.
 			measureTemperature = false;
@@ -119,6 +136,20 @@ static void* tempSensorRoutine(void *dataObj)
 
 			mq_send(tempToMain,(char*)&dataToSendToMain,sizeof(mainStruct),0);
 			mq_send(tempToLogger,(char*)&dataToSendToLogger,sizeof(logStruct),0);
+			if(sendTempToSocket)
+			{
+				printf("Sending data to socket\n");
+				sendTempToSocket = false;
+				dataToSendToSocket.source = "temperature";
+				// read temperature value.
+				dataToSendToSocket.value  = y;
+				dataToSendToSocket.unit = dataReceived.unit;
+				int ret = mq_send(socketQueue, (char*)&dataToSendToSocket, sizeof(dataToSendToSocket),0);
+				if (ret < 0)
+				{
+					perror("Temperature sending to socket failed");
+				}
+			}
 			y++;
 		}
 		//if(y > 3)
@@ -161,7 +192,7 @@ static void* lightSensorRoutine(void *dataObj)
 
 
 	dataToSendToMain.status = init_success;
-    mqd_t lightToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(mainStruct));
+    mqd_t lightToMain = mqueue_init(MAINQUEUENAME,MAIN_QUEUE_SIZE,sizeof(dataToSendToMain));
 	mqd_t lightToLogger = mqueue_init(LOGQUEUENAME,LOG_QUEUE_SIZE,sizeof(logStruct));
     if(lightToMain < 0)
     {
@@ -191,6 +222,7 @@ static void* lightSensorRoutine(void *dataObj)
 		dataTOSendTOLogger.source= "light";
 		dataTOSendTOLogger.value = y;
 		
+		printf("Sending light heartbeat");
 		mq_send(lightToMain,(char*)&dataToSendToMain,sizeof(mainStruct),0);	
 		mq_send(lightToLogger,(char*)&dataTOSendTOLogger,sizeof(logStruct),0);
 		y++;
@@ -344,8 +376,10 @@ static void* socketRoutine(void *dataObj)
 
 		if(mq_receive(sensorToSocket,(char*)&dataReceivedFromSensors,sizeof(socketStruct),0)>-1)
 		{
+			printf("Data received by server queue from %s\n",dataReceivedFromSensors.source);
 			if(dataReceivedFromSensors.source=="temperature")
 			{
+				printf("Temperaturee readings received from Temp task to socket server\n");
 				if(send(clientConnected, (void*)&dataReceivedFromSensors.value,sizeof(dataReceivedFromSensors.value),0)!=sizeof(dataReceivedFromSensors.value))
 				{
 				printf("Sending temp value to client failed\n");
@@ -378,7 +412,6 @@ static void* socketRoutine(void *dataObj)
 			
 		}
 	}
-
 	close(serverSocket);
 	printf("\nServer Socket Closed !!\n");
 	pthread_exit(NULL);
@@ -489,7 +522,7 @@ int main()
     mainInfoToOthers dataObj;
 	tempStruct requestForTemp;
 	socketStruct responseToSocket;
-	
+	lightStruct requestForLight;
 	
   
     mqd_t mainQueue = mqueue_init(MAINQUEUENAME, MAIN_QUEUE_SIZE, sizeof(mainStruct));
@@ -507,7 +540,7 @@ int main()
     mqd_t lightQueue = mqueue_init(LIGHTQUEUENAME, LIGHT_QUEUE_SIZE, sizeof(lightStruct));
     if(lightQueue < 0)
     {
-        perror("Light queue creation failed");
+        perror("Light queue init failed");
     }
 	
 	mqd_t socketQueue = mqueue_init(SOCKETQUEUENAME, SOCKET_QUEUE_SIZE, sizeof(socketStruct));
@@ -614,7 +647,7 @@ int main()
 	timerConfigTemp.it_interval.tv_nsec = 0;
 	timerConfigTemp.it_interval.tv_sec  = 0;
 	timerConfigTemp.it_value.tv_nsec    = 0;
-	timerConfigTemp.it_value.tv_sec     = 1;
+	timerConfigTemp.it_value.tv_sec     = 5;
 
 	timerConfigLight.it_interval.tv_nsec = 0;
 	timerConfigLight.it_interval.tv_sec  = 0;
@@ -658,30 +691,30 @@ int main()
         int ret=mq_receive(mainQueue, (char*)&dataToReceive, sizeof(mainStruct),0);
         if(ret>-1)
         {
-			printf("Data source from main queue %s\n",dataToReceive.source);
-			printf("Data success = %d\n",dataToReceive.status);
-			printf("Data mesage_type = %d\n",dataToReceive.messageType);
+			//printf("Data source from main queue %s\n",dataToReceive.source);
+			//printf("Data success = %d\n",dataToReceive.status);
+			//printf("Data mesage_type = %d\n",dataToReceive.messageType);
 			if((strcmp(dataToReceive.source,"temperature"))==0 && dataToReceive.messageType == update)
 			{
 				switch(dataToReceive.status)
 				{
 				case init_success:
-					printf("Init_success message received\n");
+					//printf("Init_success message received\n");
 					isAlive = isAlive | TEMPERATURE_TASK;
 					break;
 				case success:
-					printf("Success message is received\n");
+					//printf("Success message is received\n");
 					if((timer_settime(timerTemp, 0, &timerConfigTemp, NULL)) < 0)
 					{
 						perror("Temp Timer set failed");
 					}
 					break;
 				case fail:
-					printf("Fail message is received\n");
+					//printf("Fail message is received\n");
 					isAlive = isAlive & ~TEMPERATURE_TASK;
 					break;
 				case init_failure:
-					printf("Init_failure message received\n");
+					//printf("Init_failure message received\n");
 					isAlive = isAlive & ~TEMPERATURE_TASK;
 					break;
 				}
@@ -691,22 +724,22 @@ int main()
 				switch(dataToReceive.status)
 				{
 				case init_success:
-					printf("Init_success message received\n");
+					//printf("Init_success message received\n");
 					isAlive = isAlive | LIGHT_TASK;
 					break;
 				case success:
-					printf("Success message is received\n");
+					//printf("Success message is received\n");
 					if((timer_settime(timerLight, 0, &timerConfigLight, NULL)) < 0)
 					{
 						perror("Light Timer set failed");
 					}
 					break;
 				case fail:
-					printf("Fail message is received\n");
+					//printf("Fail message is received\n");
 					isAlive = isAlive & ~LIGHT_TASK;
 					break;
 				case init_failure:
-					printf("Init_failure message received\n");
+					//printf("Init_failure message received\n");
 					isAlive = isAlive & ~LIGHT_TASK;
 					break;
 				}
@@ -716,22 +749,22 @@ int main()
 				switch(dataToReceive.status)
 				{
 				case init_success:
-					printf("Init_success message received\n");
+					//printf("Init_success message received\n");
 					isAlive = isAlive | LOGGER_TASK;
 					break;
 				case success:
-					printf("Success message is received\n");
+					//printf("Success message is received\n");
 					if((timer_settime(timerLog, 0, &timerConfigLog, NULL)) < 0)
 					{
 						perror("Logger Timer set failed");
 					}
 					break;
 				case fail:
-					printf("Fail message is received\n");
+					//printf("Fail message is received\n");
 					isAlive = isAlive & ~LOGGER_TASK;
 					break;
 				case init_failure:
-					printf("Init_failure message received\n");
+					//printf("Init_failure message received\n");
 					isAlive = isAlive & ~LOGGER_TASK;
 					break;
 				}
@@ -741,22 +774,22 @@ int main()
 				switch(dataToReceive.status)
 				{
 				case init_success:
-					printf("Init_success message received\n");
+					//printf("Init_success message received\n");
 					isAlive = isAlive | SOCKET_TASK;
 					break;
 				case success:
-					printf("Success message is received\n");
+					//printf("Success message is received\n");
 					if((timer_settime(timerSocket, 0, &timerConfigSocket, NULL)) < 0)
 					{
 						perror("Socket Timer set failed");
 					}
 					break;
 				case fail:
-					printf("Fail message is received\n");
+					//printf("Fail message is received\n");
 					isAlive = isAlive & ~SOCKET_TASK;
 					break;
 				case init_failure:
-					printf("Init_failure message received\n");
+					//printf("Init_failure message received\n");
 					isAlive = isAlive & ~SOCKET_TASK;
 					break;
 				}
@@ -840,7 +873,7 @@ static void signal_handler(int sig, siginfo_t *si, void *uc)
 		break;
 	case 38:
 		// Signal instructing to take temperature sensor reading and send heartbeat
-		printf("SIGRTMIN+4(TempTimeHandler) signal is received\n");
+		//printf("SIGRTMIN+4(TempTimeHandler) signal is received\n");
 		measureTemperature = true;
 		break;
 	case 39:
@@ -850,11 +883,11 @@ static void signal_handler(int sig, siginfo_t *si, void *uc)
 		break;
 	case 40:
 		// Signal instructing logger task to send heartbeat to main indicating it is alive
-		printf("SIGRTMIN+6(LoggerTimerHandler) signal is received\n");
+		//printf("SIGRTMIN+6(LoggerTimerHandler) signal is received\n");
 		loggerHeartBeat = true;
 		break;
 	case 41:
-		printf("SIGRTMIN+7(SocketTimerHandler) signal is received\n");
+		//printf("SIGRTMIN+7(SocketTimerHandler) signal is received\n");
 		socketHeartBeat = true;
 		break;
 	}

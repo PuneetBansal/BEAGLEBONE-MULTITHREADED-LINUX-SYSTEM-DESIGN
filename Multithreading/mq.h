@@ -42,7 +42,7 @@ typedef struct{
 }tempStruct;
 
 typedef struct{
-
+	char source[20];
 }lightStruct;
 
 
