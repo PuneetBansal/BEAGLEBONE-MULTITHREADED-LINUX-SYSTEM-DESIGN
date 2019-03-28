@@ -771,7 +771,7 @@ int main()
 						printf("__func() sending request to temp sensor task to send data to socket task\n");
 						strcpy(requestForTemp.source, "main");
 						strcpy(requestForTemp.unit, dataToReceive.unit);
-						int noOfBytesSent = mq_send(tempQueue, (char*)&requestForTemp, sizeof(requestForTemp), 0);
+						int noOfBytesSent = mq_send(tempQueue, (char*)&requestForTemp, sizeof(tempStruct), 0);
 						if(noOfBytesSent < 0)
 						{
 							perror("Sending request failed");
@@ -784,7 +784,7 @@ int main()
 					{
 						printf("__func() temp sensor task is not active\n");
 						strcpy(responseToSocket.source, "main");
-						int noOfBytesSent = mq_send(socketQueue, (char*)&responseToSocket, sizeof(responseToSocket), 0);
+						int noOfBytesSent = mq_send(socketQueue, (char*)&responseToSocket, sizeof(socketStruct), 0);
 						if(noOfBytesSent < 0)
 						{
 							perror("Sending response failed");
