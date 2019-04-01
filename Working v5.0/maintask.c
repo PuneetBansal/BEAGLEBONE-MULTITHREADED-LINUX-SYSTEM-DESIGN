@@ -4,6 +4,7 @@
 * Description : The main logic of the code                                                      *
 * Tools used  : GNU make, gcc, arm-linux-gcc                                                    *
 ************************************************************************************************/
+https://stackoverflow.com/questions/18021189/how-to-connect-two-computers-over-internet-using-socket-programming-in-c
 
 #include <unistd.h>
 #include <sys/syscall.h>

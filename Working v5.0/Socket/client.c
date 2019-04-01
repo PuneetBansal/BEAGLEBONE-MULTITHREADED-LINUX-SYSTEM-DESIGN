@@ -1,3 +1,12 @@
+/************************************************************************************************
+* File name   : client.c                                                                        *
+* Authors     : Nachiket Kelkar and Puneet Bansal                                               *
+* Description : The functions definition for client                                             *
+* Tools used  : GNU make, gcc, arm-linux-gcc.                                                   *
+************************************************************************************************/
+https://stackoverflow.com/questions/18021189/how-to-connect-two-computers-over-internet-using-socket-programming-in-c 
+
+
 #include<stdio.h>
 #include<sys/types.h>
 #include<sys/socket.h>
