@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "temp_i2c.h": "c",
+        "lightsensor.h": "c",
+        "stdint.h": "c",
+        "stat.h": "c",
+        "fcntl.h": "c",
+        "myi2c.h": "c"
+    }
+}
